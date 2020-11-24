@@ -20,6 +20,7 @@ import argparse
 class ambf_dvrk_interface_psm:
 
   TOPIC_NAMESPACE_BASE = "dvrk"
+  JOINT_NAMES = ["outer_yaw", "outer_pitch", "outer_insertion", "outer_roll", "outer_wrist_pitch", "outer_wrist_yaw"]
 
   # Constructor
   def __init__(self, arm_name):
@@ -138,22 +139,24 @@ class ambf_dvrk_interface_psm:
       measured_q = self.b.get_all_joint_pos()
       measured_v = self.b.get_all_joint_vel()
       measured_e = self.b.get_all_joint_effort()
-      joint_n = len(measured_q)
-      joint_names = []
-      for i in range(len(measured_q)):
-        joint_names.append(self.b.get_joint_name_from_idx(i))
 
-      joint_state_msg = q2rosjointstate(measured_q, measured_v, measured_e, joint_names)
+      joint_state_msg = q2rosjointstate(measured_q, measured_v, measured_e)
       joint_state_msg.header.stamp = stamp
 
-      T_7_0_fk = convert_mat_to_frame(compute_FK(measured_q))
+      jaw_msg = q2rosjaw(measured_q, measured_v, measured_e)
+      jaw_msg.header.stamp = stamp
+
+      q_mod_jaw = measured_q[0:5]
+      q_mod_jaw.append((measured_q[5] - measured_q[6]) / 2.0)
+      T_7_0_fk = convert_mat_to_frame(compute_FK(q_mod_jaw))
 
       pose_msg = PoseStamped()
       pose_msg.pose = frame2rospose(T_7_0_fk)
-      pose_msg.header.stamp = rospy.Time.now()
+      pose_msg.header.stamp = stamp
 
       self.pos_current_pub.publish(pose_msg)
       self.joint_current_pub.publish(joint_state_msg)
+      self.jaw_current_pub.publish(jaw_msg)
       rate.sleep()
 
 
@@ -177,13 +180,28 @@ def frame2rospose(F):
   p.orientation.w = w
   return p
 
-def q2rosjointstate(q,v,e,names):
+def q2rosjointstate(q,v,e):
   joint_state = JointState()
-  joint_state.name = names
-  joint_state.position = q
-  joint_state.velocity = v
-  joint_state.effort = e
+  joint_state.name = ambf_dvrk_interface_psm.JOINT_NAMES
+  q_dvrk = q[0:5]
+  q_dvrk.append((q[5] - q[6]) / 2.0)
+  v_dvrk =  v[0:5]
+  v_dvrk.append((v[5] - v[6]) / 2.0)
+  e_dvrk = e[0:5]
+  e_dvrk.append((e[5] - e[6]) / 2.0) # not sure
+
+  joint_state.position = q_dvrk
+  joint_state.velocity = v_dvrk
+  joint_state.effort = e_dvrk
   return joint_state
+
+def q2rosjaw(q,v,e):
+  jaw = JointState()
+  jaw.name = ["jaw"]
+  jaw.position = [q[5] + q[6]]
+  jaw.velocity = [v[5] + v[6]]
+  jaw.effort = [e[5] + e[6]]  # not sure
+  return jaw
 
 
 # Main function
@@ -197,7 +215,7 @@ def main(args):
   relay = ambf_dvrk_interface_psm(args.arm)
   worker = threading.Thread(target=relay.pub_current_pos_thread)
   worker.start()
-  #rospy.init_node('ambf_to_ros_psm', anonymous=True)
+  time.sleep(0.2)
   relay.home()
   try:
     rospy.spin()
