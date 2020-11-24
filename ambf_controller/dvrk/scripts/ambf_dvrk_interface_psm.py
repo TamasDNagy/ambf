@@ -146,7 +146,7 @@ class ambf_dvrk_interface_psm:
       joint_state_msg = q2rosjointstate(measured_q, measured_v, measured_e, joint_names)
       joint_state_msg.header.stamp = stamp
 
-      T_7_0_fk = compute_FK(measured_q)
+      T_7_0_fk = convert_mat_to_frame(compute_FK(measured_q))
 
       pose_msg = PoseStamped()
       pose_msg.pose = frame2rospose(T_7_0_fk)
@@ -168,9 +168,9 @@ def rospose2frame(p):
 def frame2rospose(F):
   p = Pose()
   x,y,z,w = F.M.GetQuaternion()
-  p.position.x = F.P.x()
-  p.position.y = F.P.y()
-  p.position.z = F.P.z()
+  p.position.x = F.p.x()
+  p.position.y = F.p.y()
+  p.position.z = F.p.z()
   p.orientation.x = x
   p.orientation.y = y
   p.orientation.z = z
@@ -179,7 +179,7 @@ def frame2rospose(F):
 
 def q2rosjointstate(q,v,e,names):
   joint_state = JointState()
-  joint_state.names = names
+  joint_state.name = names
   joint_state.position = q
   joint_state.velocity = v
   joint_state.effort = e
