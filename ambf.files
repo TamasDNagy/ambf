@@ -1,5 +1,5 @@
 __init__.py
-ambf_controller/dvrk/scripts/ambf_to_ros_psm.py
+ambf_controller/dvrk/scripts/ambf_dvrk_interface_psm.py
 ambf_controller/dvrk/scripts/ecmFK.py
 ambf_controller/dvrk/scripts/ecmIK.py
 ambf_controller/dvrk/scripts/joint_space_trajectory_generator.py
